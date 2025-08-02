@@ -122,19 +122,21 @@ class Program
             Raylib.EndMode3D();
             
             rlImGui.Begin();
-            if (ImGui.Begin("Settings"))
-            {
-                ImGui.Text($"FPS: {1f/(float)Raylib.GetFrameTime()}");
-                ImGui.SliderFloat("distance", ref dist, 10f, 400f);
-                ImGui.SliderFloat("scale", ref scale, 1f, 10f);
-                ImGui.SliderFloat("relative brightness factor", ref StarParser.visibility, 0.001f, 1f);
-                ImGui.SliderFloat("relative size factor", ref StarParser.lowerBound, 0.03f, 0.99f);
-                ImGui.SliderFloat("gamma", ref extraBrightness, 0.0f, 0.99f);
-                ImGui.SeparatorText("Years");
-                ImGui.Text($"Current year: {2000f + yearsSinceJ2000}");
-                ImGui.SliderFloat("Years per second", ref dYdT, -10000f, 10000f);
-                ImGui.End();
-            }
+
+            ImGui.Begin("Settings");
+            
+            ImGui.Text($"FPS: {1f/(float)Raylib.GetFrameTime()}");
+            ImGui.SliderFloat("distance", ref dist, 10f, 400f);
+            ImGui.SliderFloat("scale", ref scale, 1f, 10f);
+            ImGui.SliderFloat("relative brightness factor", ref StarParser.visibility, 0.001f, 1f);
+            ImGui.SliderFloat("relative size factor", ref StarParser.lowerBound, 0.03f, 0.99f);
+            ImGui.SliderFloat("gamma", ref extraBrightness, 0.0f, 0.99f);
+            ImGui.SeparatorText("Years");
+            ImGui.Text($"Current year: {2000f + yearsSinceJ2000}");
+            ImGui.SliderFloat("Years per second", ref dYdT, -10000f, 10000f);
+            
+            ImGui.End();
+            
             rlImGui.End();
             
             Raylib.EndDrawing();
