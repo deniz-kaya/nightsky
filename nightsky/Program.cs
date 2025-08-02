@@ -1,4 +1,6 @@
 ﻿using System.Numerics;
+using System.Xml.Schema;
+using Microsoft.VisualBasic;
 using nightsky.Types;
 
 namespace nightsky;
@@ -12,29 +14,28 @@ class Program
 {
     static void Main(string[] args)
     {
-        string filepath = "C:\\Users\\blind\\RiderProjects\\nightsky\\nightsky\\Data\\BSC5";
-        Star[] stars = StarParser.GetStarData(filepath);
-        Console.Write("complete!");
-        bak:
-        Console.WriteLine("input index for the mfn star thing information");
-        int i = int.Parse(Console.ReadLine());
-        Console.WriteLine($"no: {i}");
-        Console.WriteLine($"RA: {stars[i].RA}");
-        Console.WriteLine($"dec: {stars[i].dec}");
-        Console.WriteLine($"spec: {stars[i].color}");
-        Console.WriteLine($"brightness: {stars[i].brightness}");
-        Console.WriteLine($"dRA: {stars[i].dRA}");
-        Console.WriteLine($"dDec: {stars[i].dDec}");
-        goto bak;
-    }
-    static void zMain(string[] args)
-    {
         const int screenWidth = 800;
         const int screenHeight = 600;
         const float DEG2RAD = 0.0174533f;
+        Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
         Raylib.InitWindow(screenWidth, screenHeight, "Raylib-CS 3D Camera with WASD + Arrows");
+        rlImGui.Setup(true);
         Raylib.SetTargetFPS(60);
 
+        float yearsSinceJ2000 = 0f;
+        float extraBrightness = 0f; 
+        float dYdT = 0;
+        float dist = 60f;
+        float scale = 1.3f;
+        const int texSize = 128;
+
+        Image starImage = Raylib.GenImageGradientRadial(texSize, texSize, 0.5f, Color.White, Color.Blank);
+        Texture2D star = Raylib.LoadTextureFromImage(starImage);
+        Raylib.UnloadImage(starImage);
+        
+        Mesh starMesh = Raylib.GenMeshSphere(1f, 16, 16); // low resolution sphere
+        Model starModel = Raylib.LoadModelFromMesh(starMesh);
+        
         // Camera settings
         Camera3D camera = new Camera3D();
         camera.Position = new Vector3(0.0f, 2.0f, 4.0f);
@@ -45,7 +46,8 @@ class Program
 
         float yaw = 0.0f;
         float pitch = 0.0f;
-
+        string filepath = "C:\\Users\\blind\\RiderProjects\\nightsky\\nightsky\\Data\\BSC5";
+        Star[] stars = StarParser.GetStarData(filepath);
         while (!Raylib.WindowShouldClose())
         {
             // ========== Input ==========
@@ -53,8 +55,8 @@ class Program
             float rotSpeed = 1.0f;
 
             // Arrow keys for pitch/yaw
-            if (Raylib.IsKeyDown(KeyboardKey.Right)) yaw += rotSpeed;
-            if (Raylib.IsKeyDown(KeyboardKey.Left)) yaw -= rotSpeed;
+            if (Raylib.IsKeyDown(KeyboardKey.Right)) yaw -= rotSpeed;
+            if (Raylib.IsKeyDown(KeyboardKey.Left)) yaw += rotSpeed;
             if (Raylib.IsKeyDown(KeyboardKey.Up)) pitch += rotSpeed;
             if (Raylib.IsKeyDown(KeyboardKey.Down)) pitch -= rotSpeed;
 
@@ -66,70 +68,79 @@ class Program
             float pitchRad = DEG2RAD * pitch;
 
             // Direction vectors
-            Vector3 forward = new Vector3(
+            Vector3 forwardMovement = new Vector3(
                 (float)(Math.Cos(pitchRad) * Math.Sin(yawRad)),
                 (float)(Math.Sin(pitchRad)),
                 (float)(Math.Cos(pitchRad) * Math.Cos(yawRad))
             );
 
-            Vector3 right = new Vector3(
+            Vector3 rightMovement = new Vector3(
                 (float)Math.Sin(yawRad - MathF.PI / 2),
                 0.0f,
                 (float)Math.Cos(yawRad - MathF.PI / 2)
             );
 
             // WASD movement
-            if (Raylib.IsKeyDown(KeyboardKey.W)) camera.Position += forward * moveSpeed;
-            if (Raylib.IsKeyDown(KeyboardKey.S)) camera.Position -= forward * moveSpeed;
-            if (Raylib.IsKeyDown(KeyboardKey.A)) camera.Position -= right * moveSpeed;
-            if (Raylib.IsKeyDown(KeyboardKey.D)) camera.Position += right * moveSpeed;
+            if (Raylib.IsKeyDown(KeyboardKey.W)) camera.Position += forwardMovement * moveSpeed;
+            if (Raylib.IsKeyDown(KeyboardKey.S)) camera.Position -= forwardMovement * moveSpeed;
+            if (Raylib.IsKeyDown(KeyboardKey.A)) camera.Position -= rightMovement * moveSpeed;
+            if (Raylib.IsKeyDown(KeyboardKey.D)) camera.Position += rightMovement * moveSpeed;
 
             // Update camera target
-            camera.Target = camera.Position + forward;
-
+            camera.Target = camera.Position + forwardMovement;
+            
+            //Update current date
+            yearsSinceJ2000 += dYdT * Raylib.GetFrameTime();
             // ========== Drawing ==========
             Raylib.BeginDrawing();
-            Raylib.ClearBackground(Color.RayWhite);
+            Raylib.ClearBackground(Color.Black);
 
             Raylib.BeginMode3D(camera);
-            Raylib.DrawGrid(20, 1.0f);
-            Raylib.DrawCube(new Vector3(0, 1, 0), 1, 1, 1, Color.Red);
+            
+            Raylib.DrawSphere(new Vector3(0, 0, 0), 3, Color.DarkGreen);
+            Raylib.DrawSphereWires(new Vector3(0, 0, 0), 3, 16,16,Color.Black);
+            
+            foreach (Star s in stars)
+            {
+                Vector3 unitPos = s.ConstructPositionVector(yearsSinceJ2000);
+                Vector3 starPos = unitPos * dist;
+                if (Vector3.Dot(starPos - camera.Position, unitPos) > 0.1f)
+                {
+                     Vector3 forward = -unitPos;
+                     Vector3 right = Vector3.Cross(forward, Vector3.UnitY);
+                     Vector3 up = Vector3.Cross(right, forward);
+                     Vector2 size = new Vector2(StarParser.MagnitudeToBrightness(s.mag) * scale);
+                     Rectangle rect = new Rectangle(0,0 , texSize, texSize);
+                     Vector2 origin = Vector2.Divide(size, 2f);
+                     Color c = Raylib.ColorAlpha(s.color, StarParser.BrightnessAlpha(s.brightness) + extraBrightness);
+                     Raylib.DrawBillboardPro(camera, star, rect, starPos, up, size, origin, 0f, c);
+                     // Raylib.DrawModelEx(starModel, starPos, Vector3.UnitY, 0f,
+                     //    new Vector3(s.brightness * scale), s.color);
+                }
+            }
+            
             Raylib.EndMode3D();
-
-            Raylib.DrawText("WASD = Move | Arrow Keys = Look", 10, 10, 20, Color.DarkGray);
+            
+            rlImGui.Begin();
+            if (ImGui.Begin("Settings"))
+            {
+                ImGui.Text($"FPS: {1f/(float)Raylib.GetFrameTime()}");
+                ImGui.SliderFloat("distance", ref dist, 10f, 400f);
+                ImGui.SliderFloat("scale", ref scale, 1f, 10f);
+                ImGui.SliderFloat("relative brightness factor", ref StarParser.visibility, 0.001f, 1f);
+                ImGui.SliderFloat("relative size factor", ref StarParser.lowerBound, 0.03f, 0.99f);
+                ImGui.SliderFloat("gamma", ref extraBrightness, 0.0f, 0.99f);
+                ImGui.SeparatorText("Years");
+                ImGui.Text($"Current year: {2000f + yearsSinceJ2000}");
+                ImGui.SliderFloat("Years per second", ref dYdT, -10000f, 10000f);
+                ImGui.End();
+            }
+            rlImGui.End();
+            
             Raylib.EndDrawing();
         }
-
-        Raylib.CloseWindow();
-    }
-    static void aMain(string[] args)
-    {
-        // before your game loop
-        
-        Raylib.InitWindow(1600, 900, "Night Sky");
-        Raylib.SetExitKey(KeyboardKey.Null);
-        rlImGui.Setup(true);
-        Raylib.SetTargetFPS(60);
-        Camera3D camera = new Camera3D();
-        camera.Projection = CameraProjection.Perspective;
-        
-        
-        //game loop begin
-        
-        Raylib.BeginDrawing();
-        
-
-        //imgui windows
-        rlImGui.Begin();			
-
-        rlImGui.End();
-        //imgui windows
-        
-        Raylib.EndDrawing();
-        
-        //------
-        //game loop end
-
         rlImGui.Shutdown();
+        
+        Raylib.CloseWindow();
     }
 }
