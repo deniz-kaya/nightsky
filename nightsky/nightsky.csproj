@@ -16,4 +16,8 @@
       <Folder Include="Files\" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Include="Shaders\alphaDiscard.fs" />
+    </ItemGroup>
+
 </Project>

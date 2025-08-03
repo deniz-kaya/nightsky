@@ -21,7 +21,7 @@ class Program
         Raylib.InitWindow(screenWidth, screenHeight, "Raylib-CS 3D Camera with WASD + Arrows");
         rlImGui.Setup(true);
         Raylib.SetTargetFPS(60);
-
+        Shader alphaDiscard = Raylib.LoadShader(null, "C:\\Users\\blind\\RiderProjects\\nightsky\\nightsky\\Shaders\\alphaDiscard.fs");
         float yearsSinceJ2000 = 0f;
         float extraBrightness = 0f; 
         float dYdT = 0;
@@ -29,13 +29,12 @@ class Program
         float scale = 1.3f;
         const int texSize = 128;
 
-        Image starImage = Raylib.GenImageGradientRadial(texSize, texSize, 0.5f, Color.White, Color.Blank);
+        
+        
+        Image starImage = Raylib.GenImageGradientRadial(texSize, texSize, 1f, Color.White, Color.Blank);
         Texture2D star = Raylib.LoadTextureFromImage(starImage);
         Raylib.UnloadImage(starImage);
-        
-        Mesh starMesh = Raylib.GenMeshSphere(1f, 16, 16); // low resolution sphere
-        Model starModel = Raylib.LoadModelFromMesh(starMesh);
-        
+                
         // Camera settings
         Camera3D camera = new Camera3D();
         camera.Position = new Vector3(0.0f, 2.0f, 4.0f);
@@ -43,7 +42,7 @@ class Program
         camera.Up = new Vector3(0.0f, 1.0f, 0.0f);
         camera.FovY = 45.0f;
         camera.Projection = CameraProjection.Perspective;
-
+        
         float yaw = 0.0f;
         float pitch = 0.0f;
         string filepath = "C:\\Users\\blind\\RiderProjects\\nightsky\\nightsky\\Data\\BSC5";
@@ -97,28 +96,29 @@ class Program
 
             Raylib.BeginMode3D(camera);
             
-            Raylib.DrawSphere(new Vector3(0, 0, 0), 3, Color.DarkGreen);
+            Raylib.BeginShaderMode(alphaDiscard);
+            Raylib.DrawSphere(new Vector3(0, 0, 0), 1, Color.DarkGreen);
             Raylib.DrawSphereWires(new Vector3(0, 0, 0), 3, 16,16,Color.Black);
             
+            Vector3 forward = camera.Target - camera.Position;
+            Vector3 right = Vector3.Cross(forward, Vector3.UnitY);
+            Vector3 up = Vector3.Normalize(Vector3.Cross(right, forward));
+            
+            Rectangle rect = new Rectangle(0,0 , texSize, texSize);
             foreach (Star s in stars)
             {
                 Vector3 unitPos = s.ConstructPositionVector(yearsSinceJ2000);
                 Vector3 starPos = unitPos * dist;
-                if (Vector3.Dot(starPos - camera.Position, unitPos) > 0.1f)
-                {
-                     Vector3 forward = -unitPos;
-                     Vector3 right = Vector3.Cross(forward, Vector3.UnitY);
-                     Vector3 up = Vector3.Cross(right, forward);
-                     Vector2 size = new Vector2(StarParser.MagnitudeToBrightness(s.mag) * scale);
-                     Rectangle rect = new Rectangle(0,0 , texSize, texSize);
-                     Vector2 origin = Vector2.Divide(size, 2f);
-                     Color c = Raylib.ColorAlpha(s.color, StarParser.BrightnessAlpha(s.brightness) + extraBrightness);
-                     Raylib.DrawBillboardPro(camera, star, rect, starPos, up, size, origin, 0f, c);
-                     // Raylib.DrawModelEx(starModel, starPos, Vector3.UnitY, 0f,
-                     //    new Vector3(s.brightness * scale), s.color);
-                }
+                
+                Vector2 size = new Vector2(StarParser.MagnitudeToBrightness(s.mag) * scale);
+                Vector2 origin = Vector2.Divide(size, 2f);
+
+                Color c = Raylib.ColorAlpha(s.color, StarParser.BrightnessAlpha(s.brightness) + extraBrightness);
+                Raylib.DrawBillboardPro(camera, star, rect, starPos, up, size, origin, 0f, c);
+                     
             }
             
+            Raylib.EndShaderMode();
             Raylib.EndMode3D();
             
             rlImGui.Begin();
